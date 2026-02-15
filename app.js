@@ -8,7 +8,7 @@ import rateLimit from "express-rate-limit";
 dotenv.config();
 
 import AppError from "./utils/appError.js";
-
+import oauthRouter from "./routes/oauthRoutes.js";
 import mcpRouter from "./routes/mcpRoutes.js";
 
 const app = express();
@@ -37,7 +37,9 @@ const corsOptions = {
     "x-engage-gpt-mcp-token",
     "mcp-protocol-version",
     "mcp-connection-token",
+    "Mcp-Session-Id",
   ],
+  exposedHeaders: ["Mcp-Session-Id", "WWW-Authenticate"],
   credentials: true,
   maxAge: 86400,
   preflightContinue: false,
@@ -68,7 +70,16 @@ const limiter = createRateLimiter(
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(helmet());
-app.use(compression());
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.path.includes("/sse")) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  }),
+);
 app.use(mongoSanitize());
 app.use("/api/", limiter);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -85,14 +96,9 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
-// Default root route
-app.get("/", (req, res) => {
-  res.status(200).json({
-    message: "EngageGPT MCP Server is up and running",
-    environment: NODE_ENV,
-    timestamp: new Date().toISOString(),
-  });
-});
+// Mount OAuth routes BEFORE root route (required for mcp-remote)
+app.use("/", oauthRouter);
+app.use("/mcp/oauth", oauthRouter);
 
 // Mount MCP router
 app.use("/mcp", mcpRouter);

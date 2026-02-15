@@ -18,8 +18,11 @@ router.get("/", (req, res) => {
       prompts: ["draft-linkedin-post"],
     },
     authentication: {
-      methods: ["connection_token"],
-      description: "Use MCP_CONNECTION_TOKEN environment variable",
+      methods: ["oauth2"],
+      oauth: {
+        authorization_endpoint: `${req.protocol}://${req.get("host")}/mcp/oauth/authorize`,
+        token_endpoint: `${req.protocol}://${req.get("host")}/mcp/oauth/token`,
+      },
     },
   });
 });
@@ -30,5 +33,21 @@ router.post(
   verifyMcpToken,
   mcpController.handleHttpMcp,
 );
+
+router.get(
+  "/sse",
+  validateMcpProtocol,
+  verifyMcpToken,
+  mcpController.handleSse,
+);
+
+router.post(
+  "/message",
+  validateMcpProtocol,
+  verifyMcpToken,
+  mcpController.handleSseMessage,
+);
+
+router.delete("/", mcpController.handleMcpDelete);
 
 export default router;
