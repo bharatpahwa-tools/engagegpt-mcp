@@ -68,7 +68,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.json({ limit: "10mb" }));
 
 // API Routes
-app.use("/", mcpRouter);
+app.use("/mcp", mcpRouter);
 
 // Health check route
 app.get("/api/v1/health", (req, res) => {
