@@ -1,35 +1,42 @@
 import dotenv from "dotenv";
-dotenv.config();
-
 import express from "express";
 import cors from "cors";
 import compression from "compression";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import rateLimit from "express-rate-limit";
+dotenv.config();
 
-// UTILS
 import AppError from "./utils/appError.js";
 
-// ROUTES
 import mcpRouter from "./routes/mcpRoutes.js";
 
 const app = express();
-
-// ENVIRONMENT VARIABLES
 const NODE_ENV = process.env.NODE_ENV || "development";
+const claudeDomains = ["https://claude.ai", "https://api.claude.ai"];
 
-// Enhanced CORS configuration
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:3000"];
+
+const allOrigins = [...corsOrigins, ...claudeDomains];
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim())
-    : ["http://localhost:3000"],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allOrigins.some((allowed) => origin.startsWith(allowed))) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
     "Authorization",
     "x-engage-gpt-mcp-token",
     "mcp-protocol-version",
+    "mcp-connection-token",
   ],
   credentials: true,
   maxAge: 86400,
@@ -66,11 +73,9 @@ app.use(mongoSanitize());
 app.use("/api/", limiter);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.json({ limit: "10mb" }));
+app.use(express.static("public"));
 
-// API Routes
-app.use("/mcp", mcpRouter);
-
-// Health check route
+// Health check endpoint
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     status: "success",
@@ -80,7 +85,7 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
-// Default route
+// Default root route
 app.get("/", (req, res) => {
   res.status(200).json({
     message: "EngageGPT MCP Server is up and running",
@@ -88,6 +93,9 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Mount MCP router
+app.use("/mcp", mcpRouter);
 
 // Handle undefined routes
 app.all("*", (req, res, next) => {

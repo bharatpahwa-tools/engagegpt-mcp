@@ -7,14 +7,12 @@ const envOrigins = process.env.MCP_ALLOWED_ORIGINS
   : [];
 
 export const verifyMcpToken = catchAsync(async (req, res, next) => {
-  // Accept token from multiple sources:
-  // 1. x-engage-gpt-mcp-token header (direct API calls)
-  // 2. Query parameter (fallback)
-  // 3. MCP_CONNECTION_TOKEN from request environment (HTTP client passes this)
+  // Check for connection token in headers, query params, or environment variable
   const token =
     req.headers["x-engage-gpt-mcp-token"] ||
+    req.headers["mcp-connection-token"] ||
     req.query.token ||
-    req.headers["mcp-connection-token"];
+    process.env.MCP_CONNECTION_TOKEN;
 
   if (!token) {
     return next(
@@ -55,6 +53,5 @@ export const validateMcpProtocol = (req, res, next) => {
   res.setHeader("MCP-Protocol-Version", protocolVersion);
   res.setHeader("X-Accel-Buffering", "no");
   res.setHeader("Cache-Control", "no-cache, no-transform");
-
   next();
 };

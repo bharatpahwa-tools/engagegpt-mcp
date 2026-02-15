@@ -19,18 +19,12 @@ export function createMcpServer({ user } = {}) {
       inputSchema: {},
     },
     async (_args, context) => {
-      // Works for BOTH:
-      // - SSE (sessionId)
-      // - HTTP (context.user)
-      // - Stdio (environment variable)
       const userFromSession = sessionContextMap.get(context.sessionId)?.user;
 
       const effectiveUser = userFromSession || context.user || user;
 
       try {
-        // For stdio mode (Claude Desktop), use environment variable
-        const connectionToken =
-          effectiveUser?.connectionToken || process.env.MCP_CONNECTION_TOKEN;
+        const connectionToken = effectiveUser?.connectionToken;
 
         if (!connectionToken) {
           return {
@@ -38,7 +32,7 @@ export function createMcpServer({ user } = {}) {
             content: [
               {
                 type: "text",
-                text: "MCP Connection Token not found. Please sync your LinkedIn account or set MCP_CONNECTION_TOKEN environment variable.",
+                text: "MCP Connection Token not found. Please sync your LinkedIn account.",
               },
             ],
           };
@@ -76,9 +70,7 @@ export function createMcpServer({ user } = {}) {
       const effectiveUser = userFromSession || context.user || user;
 
       try {
-        // For stdio mode (Claude Desktop), use environment variable
-        const connectionToken =
-          effectiveUser?.connectionToken || process.env.MCP_CONNECTION_TOKEN;
+        const connectionToken = effectiveUser?.connectionToken;
 
         if (!connectionToken) {
           return {
@@ -86,7 +78,7 @@ export function createMcpServer({ user } = {}) {
             content: [
               {
                 type: "text",
-                text: "No connection token found. Please set MCP_CONNECTION_TOKEN environment variable.",
+                text: "No connection token found.",
               },
             ],
           };
@@ -125,7 +117,7 @@ export function createMcpServer({ user } = {}) {
           role: "user",
           content: {
             type: "text",
-            text: `Please draft a LinkedIn post about "${args.topic}". Use my writing style found in my persona resource.`,
+            text: `Please draft a LinkedIn post about "YOUR TOPIC HERE". Use my writing style found in my persona resource.`,
           },
         },
       ],
