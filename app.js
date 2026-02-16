@@ -98,10 +98,8 @@ app.get("/api/v1/health", (req, res) => {
 
 // Mount OAuth routes BEFORE root route (required for mcp-remote)
 app.use("/", oauthRouter);
-app.use("/mcp/oauth", oauthRouter);
-
-// Mount MCP router
 app.use("/mcp", mcpRouter);
+app.use("/mcp/oauth", oauthRouter);
 
 // Handle undefined routes
 app.all("*", (req, res, next) => {
