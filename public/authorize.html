@@ -200,33 +200,12 @@
       const submitBtn = document.getElementById("submitBtn");
       const statusMessage = document.getElementById("statusMessage");
 
-      // Populate hidden inputs from URL parameters
-      (function () {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          for (const [key, value] of urlParams.entries()) {
-            if (key === "connectionToken") continue; // Don't duplicate the visible input
-
-            const hiddenInput = document.createElement("input");
-            hiddenInput.type = "hidden";
-            hiddenInput.name = key;
-            hiddenInput.value = value;
-            form.appendChild(hiddenInput);
-          }
-        } catch (e) {
-          console.error("Error populating hidden inputs:", e);
-        }
-      })();
-
       function showStatus(message, type) {
         statusMessage.textContent = message;
         statusMessage.className = `status-message ${type}`;
       }
 
       form.addEventListener("submit", (e) => {
-        // Allow default form submission!
-        // We just perform validation and UI updates here.
-
         const connectionToken = tokenInput.value.trim();
 
         if (!connectionToken) {

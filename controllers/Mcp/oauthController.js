@@ -1,4 +1,7 @@
 import crypto from "crypto";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import OAuthToken from "../../models/oauthToken.js";
 import User from "../../models/members.js";
 
@@ -84,7 +87,39 @@ export const authorize = async (req, res) => {
       callbackUrl.searchParams.set("state", state);
       console.log("[OAuth] 🔀 Redirecting to:", callbackUrl.toString());
 
-      return res.redirect(callbackUrl.toString());
+      // Use client-side redirect for better reliability and visibility
+      const redirectHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Redirecting...</title>
+          <style>
+            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f3f4f6; }
+            .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); text-align: center; max-width: 600px; }
+            h1 { color: #667eea; margin-bottom: 16px; }
+            p { color: #4b5563; margin-bottom: 24px; }
+            .url { background: #fee2e2; padding: 8px; border-radius: 4px; font-family: monospace; word-break: break-all; font-size: 12px; color: #991b1b; }
+            .btn { background: #667eea; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Success! 🎉</h1>
+            <p>Redirecting you back to Claude Desktop...</p>
+            <p><a href="${callbackUrl.toString()}" class="btn">Click here if not redirected</a></p>
+            <br>
+            <p class="url">Target: ${callbackUrl.toString()}</p>
+            <script>
+              setTimeout(() => {
+                window.location.replace("${callbackUrl.toString()}");
+              }, 100);
+            </script>
+          </div>
+        </body>
+        </html>
+      `;
+
+      return res.send(redirectHtml);
     }
 
     console.log("[OAuth] 📝 Standard OAuth flow - serving HTML form");
@@ -126,10 +161,36 @@ export const authorize = async (req, res) => {
       });
     }
 
-    console.log("[OAuth] 📄 Serving authorize.html form");
-    // Serve the custom authorization page
-    // User will enter their connection token here
-    res.sendFile("authorize.html", { root: "./public" });
+    // Read the HTML file
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const htmlPath = path.join(__dirname, "../../public/authorize.html");
+
+    try {
+      let html = await fs.readFile(htmlPath, "utf8");
+
+      // Generate hidden inputs from query params
+      const hiddenInputs = Object.entries(req.query)
+        .filter(([key]) => key !== "connectionToken") // Exclude connectionToken as it has visible input
+        .map(
+          ([key, value]) =>
+            `<input type="hidden" name="${key}" value="${value}">`,
+        )
+        .join("\n");
+
+      // Inject hidden inputs into the form
+      // We target the opening <form> tag to append inputs immediately after it
+      html = html.replace(
+        '<form id="authForm">',
+        `<form id="authForm">\n${hiddenInputs}`,
+      );
+
+      console.log("[OAuth] 📝 Injected hidden inputs:", hiddenInputs);
+      return res.send(html);
+    } catch (error) {
+      console.error("[OAuth] ❌ Error reading authorize.html:", error);
+      return res.status(500).send("Internal Server Error");
+    }
   } catch (error) {
     console.error("[OAuth] Authorization error:", error);
     res.status(500).json({
@@ -226,11 +287,66 @@ export const token = async (req, res) => {
     });
 
     // Validate grant type
+    if (grant_type === "refresh_token") {
+      const { refresh_token } = req.body;
+      if (!refresh_token) {
+        return res.status(400).json({
+          error: "invalid_request",
+          error_description: "Missing refresh_token",
+        });
+      }
+
+      console.log("[OAuth] 🔄 Refreshing token...");
+      const tokenRecord = await OAuthToken.findOne({
+        refreshToken: refresh_token,
+        isRevoked: false,
+      }).populate("userId");
+
+      if (!tokenRecord) {
+        console.log("[OAuth] ❌ Invalid or revoked refresh_token");
+        return res.status(400).json({
+          error: "invalid_grant",
+          error_description: "Invalid refresh_token",
+        });
+      }
+
+      // Generate new tokens
+      const accessToken = generateToken();
+      const newRefreshToken = generateToken();
+      const expiresIn = 30 * 24 * 3600; // 30 days
+
+      // Save new token
+      await OAuthToken.create({
+        userId: tokenRecord.userId._id,
+        accessToken,
+        refreshToken: newRefreshToken,
+        tokenType: "Bearer",
+        scope: tokenRecord.scope,
+        expiresAt: new Date(Date.now() + expiresIn * 1000),
+        clientId: client_id,
+        clientName: "Claude Desktop",
+      });
+
+      // Optionally revoke old token (Refresh Token Rotation)
+      tokenRecord.isRevoked = true;
+      await tokenRecord.save();
+
+      console.log("[OAuth] ✅ Token refreshed successfully");
+      return res.json({
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: expiresIn,
+        refresh_token: newRefreshToken,
+        scope: tokenRecord.scope,
+      });
+    }
+
     if (grant_type !== "authorization_code") {
       console.log("[OAuth] ❌ Unsupported grant type:", grant_type);
       return res.status(400).json({
         error: "unsupported_grant_type",
-        error_description: "Only authorization_code grant type is supported",
+        error_description:
+          "Only authorization_code and refresh_token grant types are supported",
       });
     }
 

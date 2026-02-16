@@ -10,7 +10,7 @@ router.post("/token", oauthController.token);
 router.post("/revoke", oauthController.revoke);
 router.post("/register", oauthController.register);
 router.get(
-  "/.well-known/oauth-protected-resource",
+  "/.well-known/oauth-protected-resource*",
   oauthController.resourceMetadata,
 );
 router.get(

@@ -105,7 +105,7 @@ export const handleSse = async (req, res) => {
     const mcp = createMcpServer({ user: req.user });
     const { sessionId } = await createSseSession(res, mcp);
     console.log(`[SSE] ✅ SSE Session established: ${sessionId}`);
-  } catch (error) {
+  } catch (error) { 
     console.error(`[SSE] ❌ Failed to establish SSE session:`, error);
     if (!res.headersSent) res.status(500).end();
   }
