@@ -66,6 +66,9 @@ const limiter = createRateLimiter(
   "Too many requests from this IP, please try again later.",
 );
 
+// Trust proxy (required for correct protocol detection behind load balancers/Render/Heroku/etc)
+app.set("trust proxy", 1);
+
 // Middleware
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
