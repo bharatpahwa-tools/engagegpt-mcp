@@ -1,6 +1,9 @@
 import * as postRepository from "../../repositories/postRepository.js";
+import * as organizationRepository from "../../repositories/organizationRepository.js";
 import * as mcpHelper from "./mcpHelper.js";
+import { logActivity, logTransaction } from "../../utils/activityLogger.js";
 import AppError from "../../utils/appError.js";
+import Member from "../../models/members.js";
 
 const getPersonaContext = async (connectionToken) => {
   if (!connectionToken) {
@@ -22,6 +25,38 @@ const getPersonaContext = async (connectionToken) => {
     25,
   );
 
+  console.log("CREATING USER ACTIVITY");
+  await logActivity(organizationId, "mcp_tool_usage", {
+    tool: "get_my_persona",
+    memberId,
+    creditsUsed: 0,
+    timestamp: new Date(),
+  });
+
+  // Log organization transaction properly using the repository
+  try {
+    const org =
+      await organizationRepository.findOrganizationById(organizationId);
+    const member = await Member.findById(memberId);
+    const currentBalance = org?.credits?.balance || 0;
+
+    await organizationRepository.updateOrganizationCredits(organizationId, {
+      balance: currentBalance, // No deduction for now as per requirement
+      totalUsed: org?.credits?.totalUsed || 0,
+      transaction: {
+        type: "usage",
+        amount: 0,
+        balance: currentBalance,
+        description: `Credits used by ${member?.name || "Member"} for fetching writing persona using EngageGPT MCP`,
+        metadata: { tool: "get_my_persona", memberId },
+        createdAt: new Date(),
+      },
+    });
+    console.log("Logged MCP transaction via repository");
+  } catch (error) {
+    console.error("Failed to log MCP transaction:", error);
+  }
+
   if (!posts || posts.length === 0) {
     return "No LinkedIn post history found for this profile. Please ensure posts are synced in EngageGPT before using the persona feature.";
   }
@@ -39,6 +74,37 @@ const getEngagementInsights = async (connectionToken) => {
     organizationId,
     memberId,
   );
+  console.log("CREATING USER ACTIVITY");
+  await logActivity(organizationId, "mcp_tool_usage", {
+    tool: "get_engagement_insights",
+    memberId,
+    creditsUsed: 0,
+    timestamp: new Date(),
+  });
+
+  // Log organization transaction properly using the repository
+  try {
+    const org =
+      await organizationRepository.findOrganizationById(organizationId);
+    const member = await Member.findById(memberId);
+    const currentBalance = org?.credits?.balance || 0;
+
+    await organizationRepository.updateOrganizationCredits(organizationId, {
+      balance: currentBalance, // No deduction for now as per requirement
+      totalUsed: org?.credits?.totalUsed || 0,
+      transaction: {
+        type: "usage",
+        amount: 0,
+        balance: currentBalance,
+        description: `Credits used by ${member?.name || "Member"} for posts engagement insights using EngageGPT MCP`,
+        metadata: { tool: "get_engagement_insights", memberId },
+        createdAt: new Date(),
+      },
+    });
+    console.log("Logged MCP transaction via repository");
+  } catch (error) {
+    console.error("Failed to log MCP transaction:", error);
+  }
 
   if (!posts || posts.length === 0) return "No data found.";
 

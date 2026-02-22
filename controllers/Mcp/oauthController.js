@@ -9,6 +9,128 @@ const generateToken = () => {
   return crypto.randomBytes(32).toString("base64url");
 };
 
+const sendSuccessPage = (res, callbackUrl) => {
+  const redirectHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Redirecting | EngageGPT</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Ovo&display=swap" rel="stylesheet">
+      <style>
+        :root {
+            --primary: #004182;
+            --bg: #f8fafc;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+        body { 
+            font-family: 'Geist', sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text);
+        }
+        .card { 
+            background: white; 
+            padding: 48px; 
+            border-radius: 24px; 
+            box-shadow: 0 20px 50px rgba(0, 65, 130, 0.08); 
+            text-align: center; 
+            max-width: 480px; 
+            width: 90%;
+            animation: fadeIn 0.6s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .logo-text {
+            font-family: 'Ovo', serif;
+            font-size: 24px;
+            color: var(--primary);
+            font-weight: bold;
+            margin-bottom: 24px;
+        }
+        .loader-container {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 24px;
+        }
+        .loader {
+            width: 100%;
+            height: 100%;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .success-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #10b981;
+            font-size: 24px;
+        }
+        h1 { font-size: 24px; margin-bottom: 12px; color: var(--text); letter-spacing: -0.5px; }
+        p { color: var(--text-muted); font-size: 15px; line-height: 1.6; margin-bottom: 32px; }
+        .btn { 
+            background: var(--primary); 
+            color: white; 
+            padding: 16px 32px; 
+            border-radius: 14px; 
+            text-decoration: none; 
+            font-weight: 600; 
+            display: inline-block;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 65, 130, 0.2);
+            font-size: 15px;
+        }
+        .btn:hover {
+            background: #003366;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 65, 130, 0.3);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="logo-text">EngageGPT MCP</div>
+        <div class="loader-container">
+            <div class="loader"></div>
+        </div>
+        <h1>Authorization Successful!</h1>
+        <p>Connecting you back to Claude Desktop. We'll be ready in a moment.</p>
+        <a href="${callbackUrl.toString()}" id="redirectBtn" class="btn">Connect Now &rarr;</a>
+        <script>
+          const url = "${callbackUrl.toString()}";
+          // Attempt automatic redirect after a short animations
+          setTimeout(() => {
+            window.location.href = url;
+          }, 1500);
+        </script>
+      </div>
+    </body>
+    </html>
+  `;
+  return res.send(redirectHtml);
+};
+
 export const authorize = async (req, res) => {
   try {
     console.log("\n[OAuth] 🔐 AUTHORIZE endpoint called");
@@ -85,41 +207,9 @@ export const authorize = async (req, res) => {
       const callbackUrl = new URL(redirect_uri);
       callbackUrl.searchParams.set("code", authCode);
       callbackUrl.searchParams.set("state", state);
-      console.log("[OAuth] 🔀 Redirecting to:", callbackUrl.toString());
 
-      // Use client-side redirect for better reliability and visibility
-      const redirectHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Redirecting...</title>
-          <style>
-            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f3f4f6; }
-            .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); text-align: center; max-width: 600px; }
-            h1 { color: #667eea; margin-bottom: 16px; }
-            p { color: #4b5563; margin-bottom: 24px; }
-            .url { background: #fee2e2; padding: 8px; border-radius: 4px; font-family: monospace; word-break: break-all; font-size: 12px; color: #991b1b; }
-            .btn { background: #667eea; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>Success! 🎉</h1>
-            <p>Redirecting you back to Claude Desktop...</p>
-            <p><a href="${callbackUrl.toString()}" class="btn">Click here if not redirected</a></p>
-            <br>
-            <p class="url">Target: ${callbackUrl.toString()}</p>
-            <script>
-              setTimeout(() => {
-                window.location.replace("${callbackUrl.toString()}");
-              }, 100);
-            </script>
-          </div>
-        </body>
-        </html>
-      `;
-
-      return res.send(redirectHtml);
+      console.log("[OAuth] 🔀 Redirecting to success page...");
+      return sendSuccessPage(res, callbackUrl);
     }
 
     console.log("[OAuth] 📝 Standard OAuth flow - serving HTML form");
@@ -179,10 +269,10 @@ export const authorize = async (req, res) => {
         .join("\n");
 
       // Inject hidden inputs into the form
-      // We target the opening <form> tag to append inputs immediately after it
+      // We use a regex to match the <form id="authForm" ...> tag flexibly
       html = html.replace(
-        '<form id="authForm">',
-        `<form id="authForm">\n${hiddenInputs}`,
+        /<form\s+id="authForm"[^>]*>/i,
+        (match) => `${match}\n${hiddenInputs}`,
       );
 
       console.log("[OAuth] 📝 Injected hidden inputs:", hiddenInputs);
@@ -264,9 +354,8 @@ export const callback = async (req, res) => {
     const callbackUrl = new URL(redirect_uri);
     callbackUrl.searchParams.set("code", authCode);
     callbackUrl.searchParams.set("state", state);
-    console.log("[OAuth] 🔀 Redirecting to:", callbackUrl.toString());
-
-    res.redirect(callbackUrl.toString());
+    console.log("[OAuth] 🔀 Redirecting to success page...");
+    return sendSuccessPage(res, callbackUrl);
   } catch (error) {
     console.error("[OAuth] Callback error:", error);
     res.status(500).send("Internal server error");
